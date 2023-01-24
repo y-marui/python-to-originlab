@@ -22,7 +22,7 @@ import numpy as np
 import OriginExt
 import win32com.client
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 # Ideas for improvements:
