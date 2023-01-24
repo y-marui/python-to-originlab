@@ -25,7 +25,6 @@ import win32com.client
 __version__ = "0.1.0"
 
 
-
 # Ideas for improvements:
 # - Compile line data (labels, format, color) into df
 #   then use df to sort and group lines in origin
@@ -192,9 +191,14 @@ def matplotlib_to_origin(
         # In the comments row
         if not line.get_label()[0] == '_':
             col.Comments = line.get_label()
-
-        origin.PutWorksheet('['+wb.Name+']'+ws.Name, np.float64(line.get_xdata()).tolist(), 0, x_col_idx) # start row, start col
-        origin.PutWorksheet('['+wb.Name+']'+ws.Name, np.float64(line.get_ydata()).tolist(), 0, y_col_idx) # start row, start col
+        xdata = line.get_xdata()
+        if hasattr(xdata, "value"):
+            xdata = xdata.value
+        origin.PutWorksheet('['+wb.Name+']'+ws.Name, np.float64(xdata).tolist(), 0, x_col_idx) # start row, start col
+        ydata = line.get_ydata()
+        if hasattr(ydata, "value"):
+            ydata = ydata.value
+        origin.PutWorksheet('['+wb.Name+']'+ws.Name, np.float64(ydata).tolist(), 0, y_col_idx) # start row, start col
 
         # Tested only on origin 2016 and 2018
         if origin_version<9.5: # 2016 or earlier
@@ -282,7 +286,9 @@ def matplotlib_to_origin(
     y_axis_scale = ax.get_yscale()
     # Get axes labels
     x_axis_label = ax.get_xlabel()
+    x_axis_label = re.sub(r"\$(.+?)\$", r"\\q(\1)", x_axis_label)
     y_axis_label = ax.get_ylabel()
+    y_axis_label = re.sub(r"\$(.+?)\$", r"\\q(\1)", y_axis_label)
     title = ax.get_title()
     # Set axes titles (xb for bottom axis, yl for left y-axis, etc.)
     graph_layer.Execute('label -xb ' + x_axis_label + ';')
