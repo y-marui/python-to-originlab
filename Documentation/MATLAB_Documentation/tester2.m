@@ -12,12 +12,12 @@ dataPlots = invoke(graphLayer, 'DataPlots');
 for ci = 1 : length(x_cols)
     % Create a data range
     dr = invoke(originObj, 'NewDataRange');
-    
+
     % Add data to data range
     %                  worksheet, start row, start col, end row (-1=last), end col
     dr.invoke('Add', 'X', wksObj, 0 , x_cols(ci), -1, x_cols(ci));
     dr.invoke('Add', 'Y', wksObj, 0 , y_cols(ci), -1, y_cols(ci));
-    
+
     % Add data plot to graph layer
     % 200 -- line
     % 201 -- symbol
@@ -59,12 +59,12 @@ for wi = 1 : length(wksObj)
     for ci = 1 : length(x_cols)
         % Create a data range
         dr = invoke(originObj, 'NewDataRange');
-        
+
         % Add data to data range
         %                  worksheet, start row, start col, end row (-1=last), end col
         dr.invoke('Add', 'X', wksObj{wi}, 0 , x_cols(ci), -1, x_cols(ci));
         dr.invoke('Add', 'Y', wksObj{wi}, 0 , y_cols(ci), -1, y_cols(ci));
-        
+
         % Add data plot to graph layer
         % 200 -- line
         % 201 -- symbol
@@ -121,15 +121,15 @@ dataplots_Lum = invoke(graphLayer_V, 'DataPlots');
 for i = 1 : size(lifetimeArray,2)/3
     hrs_col_idx = 3*i - 3;
     V_col_idx = 3*i - 2;
-    
+
     % Create a data range
     dr = invoke(originObj, 'NewDataRange');
-    
+
     % Add data to data range
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% row   col   row   col
     invoke(dr, 'Add', 'X', wkSheet_lifetime, 0 , hrs_col_idx, -1, hrs_col_idx); % x is hrs
     invoke(dr, 'Add', 'Y', wkSheet_lifetime, 0 , V_col_idx, -1, V_col_idx); % y is V
-    
+
     % Add data plot to graph layer
     % 200 -- line
     % 201 -- symbol
@@ -172,12 +172,12 @@ for i = 1 : size(lifetimeArray,2)/3
     lum_col_idx = 3*i - 1;
     % Create a data range
     dr = invoke(originObj, 'NewDataRange');
-    
+
     % Add data to data range
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% row   col   row   col
     invoke(dr, 'Add', 'X', wkSheet_lifetime, 0 , hrs_col_idx, -1, hrs_col_idx); % x is hrs
     invoke(dr, 'Add', 'Y', wkSheet_lifetime, 0 , lum_col_idx, -1, lum_col_idx); % y is L/L0
-    
+
     % Add data plot to graph layer
     % 200 -- line
     % 201 -- symbol
@@ -208,15 +208,15 @@ dataplots_V = invoke(graphLayer_V, 'DataPlots');
 for i = 1 : size(lifetimeArray,2)/3
     hrs_col_idx = 3*i - 3;
     V_col_idx = 3*i - 2;
-    
+
     % Create a data range
     dr = invoke(originObj, 'NewDataRange');
-    
+
     % Add data to data range
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% row   col   row   col
     invoke(dr, 'Add', 'X', wkSheet_lifetime, 0 , hrs_col_idx, -1, hrs_col_idx); % x is hrs
     invoke(dr, 'Add', 'Y', wkSheet_lifetime, 0 , V_col_idx, -1, V_col_idx); % y is V
-    
+
     % Add data plot to graph layer
     % 200 -- line
     % 201 -- symbol

@@ -15,11 +15,11 @@
 %        ftp://ftp.mathworks.com/pub/tech-support/solutions/s29502/actxcli.dll
 % and replace the older DLL found in the following MATLAB subfolder
 %       $MATLAB\toolbox\matlab\winfun\@activex\private\actxcli.dll
-% to fix a bug in MATLAB ActiveX 
+% to fix a bug in MATLAB ActiveX
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-function CreatePlotInOrigin()   
+function CreatePlotInOrigin()
     %
     % Obtain Origin COM Server object
     % This will connect to an existing instance of Origin, or create a new one if none exist
@@ -27,11 +27,11 @@ function CreatePlotInOrigin()
 
     % Make the Origin session visible
     invoke(originObj, 'Execute', 'doc -mc 1;');
-       
+
     % Clear "dirty" flag in Origin to suppress prompt for saving current project
     % You may want to replace this with code to handling of saving current project
     invoke(originObj, 'IsModified', 'false');
-    
+
     % Load the custom project CreateOriginPlot.OPJ found in Samples area of Origin installation
     invoke(originObj, 'Execute', 'syspath$=system.path.program$;');
     strPath='';
@@ -45,12 +45,12 @@ function CreatePlotInOrigin()
     mdata = mdata';
     % Send this data over to the Data1 worksheet
     invoke(originObj, 'PutWorksheet', 'Data1', mdata);
-    
+
     % Rescale the two layers in the graph and copy graph to clipboard
     invoke(originObj, 'Execute', 'page.active = 1; layer - a; page.active = 2; layer - a;');
     % '4' makes it an OLE object (clicking opens origin)
-    invoke(originObj, 'CopyPage', 'Graph1', '4'); 
-    
-    % You can now get the graph image from clipboard and paste in PowerPoint etc. 
+    invoke(originObj, 'CopyPage', 'Graph1', '4');
+
+    % You can now get the graph image from clipboard and paste in PowerPoint etc.
     %
 % end

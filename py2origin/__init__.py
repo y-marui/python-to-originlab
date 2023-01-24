@@ -1,13 +1,5 @@
-import datetime
-import time
-import numpy as np
-import win32com.client
-import os
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
-import OriginExt
+"""Convert matplotlib figure into origin.
 
-'''
 Useful documentation sources:
 https://www.originlab.com/doc/COM/Classes/ApplicationSI
     Description of classes and functions available through COM server
@@ -18,7 +10,21 @@ https://www.originlab.com/doc/OriginC/ref/
 https://www.originlab.com/doc/LabTalk/ref/
     LabTalk commands often allow more specific/particular operations
     e.g. changing axis scales, font sizes, etc.
-'''
+"""
+
+import datetime
+import os
+import time
+
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
+import numpy as np
+import OriginExt
+import win32com.client
+
+__version__ = "0.1.0"
+
+
 
 # Ideas for improvements:
 # - Compile line data (labels, format, color) into df
@@ -31,7 +37,7 @@ def set_axis_scale(graph_layer,axis='x',scale='linear'):
     # scale = 'linear' or 'log'
     # graph_layer is origin graph_layer object
     # Axis label number format:
-    # 1 = decimal without commas, 2 = scientific, 
+    # 1 = decimal without commas, 2 = scientific,
     # 3 = engineering, and 4 = decimal with commas (for date).
     # https://www.originlab.com/doc/LabTalk/ref/Layer-Axis-Label-obj
     if scale=='linear':
@@ -68,9 +74,9 @@ def get_all_sheets(origin):
     return worksheets,worksheet_names
 def get_sheets_from_book(origin,workbooks):
     # origin is the active origin session
-    # workbooks is a COM object, string of the workbook name, 
+    # workbooks is a COM object, string of the workbook name,
         # a list of COM objects, or a list of strings
-    # This can be used to get a list of worksheets which are then passed to 
+    # This can be used to get a list of worksheets which are then passed to
     # createGraph_multiwks to create graphs
     worksheets=[]
     if isinstance(workbooks,str) or isinstance(workbooks,win32com.client.CDispatch):
@@ -96,7 +102,7 @@ def get_sheets_from_book(origin,workbooks):
                 worksheets.append(ws)
     print('Found ' + str(len(worksheets)) + ' worksheets')
     return worksheets
-    
+
 def connect_to_origin():
     # Connect to Origin client
     # OriginExt.Application() forces a new connection
@@ -110,7 +116,7 @@ def connect_to_origin():
     origin.Execute("sec -poc 3.5")
     time.sleep(3.5)
     return origin
-    
+
 def get_origin_version(origin):
     # Get origin version
     # Origin 2015 9.2xn
@@ -121,12 +127,12 @@ def get_origin_version(origin):
     # Origin 2019 >= 9.60n and < 9.65n (Fall 2019)
     # Origin 2019b >= 9.65n (Spring 2020)
     return origin.GetLTVar("@V")
-    
+
 def save_project(origin,project_name,full_path):
     # File ending is automatically added by origin
     project_name = project_name.replace('.opju','').replace('.opj','')
     origin.Execute("save " + os.path.join(full_path,project_name))
-    
+
 def matplotlib_to_origin(
             fig,ax,
             origin=None,
@@ -140,7 +146,7 @@ def matplotlib_to_origin(
     template = origin template name for desired plot, if exists
     templatePath = path on local computer to template folder
     origin = origin session, which is returned from previous calls to this program
-             if passed, a new session will not be created, and graph will be added to 
+             if passed, a new session will not be created, and graph will be added to
              current session
     '''
     # If no origin session has been passed, start a new one
@@ -157,7 +163,7 @@ def matplotlib_to_origin(
     ws.Name=worksheet_name # Set worksheet name
     # For now, assume only x and y data for each line (ignore error data)
     ws.Cols=len(ax.lines)*2 # Set number of columns in worksheet
-    
+
     # Make graph page
     template=os.path.join(template_path,template_name) # Pick template
     graph = origin.CreatePage(3, graph_name, template) # Make a graph with the template
@@ -186,10 +192,10 @@ def matplotlib_to_origin(
         # In the comments row
         if not line.get_label()[0] == '_':
             col.Comments = line.get_label()
-        
+
         origin.PutWorksheet('['+wb.Name+']'+ws.Name, np.float64(line.get_xdata()).tolist(), 0, x_col_idx) # start row, start col
         origin.PutWorksheet('['+wb.Name+']'+ws.Name, np.float64(line.get_ydata()).tolist(), 0, y_col_idx) # start row, start col
-        
+
         # Tested only on origin 2016 and 2018
         if origin_version<9.5: # 2016 or earlier
             dr = origin.NewDataRange # Make a new datarange
@@ -206,13 +212,13 @@ def matplotlib_to_origin(
         # Symbols
         # https://www.originlab.com/doc/LabTalk/ref/List-of-Symbol-Shapes
         # https://www.originlab.com/doc/LabTalk/ref/Options_for_Symbols
-        #0 = no symbol, 1 = square, 2 = circle, 3 = up triangle, 4 = down triangle, 
-        #5 = diamond, 6 = cross (+), 7 = cross (x), 8 = star (*), 9 = bar (-), 10 = bar (|), 
-        # 11 = number, 12 = LETTER, 13 = letter, 14 = right arrow, 15 = left triangle, 
+        #0 = no symbol, 1 = square, 2 = circle, 3 = up triangle, 4 = down triangle,
+        #5 = diamond, 6 = cross (+), 7 = cross (x), 8 = star (*), 9 = bar (-), 10 = bar (|),
+        # 11 = number, 12 = LETTER, 13 = letter, 14 = right arrow, 15 = left triangle,
         #16 = right triangle, 17 = hexagon, 18 = star, 19 = pentagon, 20 = sphere
         # Symbol interior
-        #0 = no symbol, 1 = solid, 2 = open, 3 = dot center, 4 = hollow, 5 = + center, 
-        # 6 = x center, 7 = - center, 8 = | center, 9 = half up, 10 = half right, 
+        #0 = no symbol, 1 = solid, 2 = open, 3 = dot center, 4 = hollow, 5 = + center,
+        # 6 = x center, 7 = - center, 8 = | center, 9 = half up, 10 = half right,
         # 11 = half down, 12 = half left
         # https://matplotlib.org/api/markers_api.html
         mpl_sym_conv = {'s':'1','o':'2','^':'3','v':'4','D':'5','+':'6','x':'7',
@@ -226,7 +232,7 @@ def matplotlib_to_origin(
                 'range rr = !' + str(line_idx+1) + '; ' +
                 'set rr -cl color('+lc+');' + # line color
                 'set rr -w 500*'+str(plt.getp(line,'linewidth'))+';') # line width
-            
+
         #Symbol
         elif plt.getp(line,'linestyle')=='None':
             graph_layer.AddPlot(dr,201) # Previously data_plots.Add()
@@ -258,10 +264,10 @@ def matplotlib_to_origin(
                 'set rr -kh 10*'+str(plt.getp(line,'mew'))+';' + # edge width
                 'set rr -cl color('+lc+');' + # line color
                 'set rr -w 500*'+str(plt.getp(line,'linewidth'))+';') # line width
-        
-        
-    
-    # For labtalk documentation of graph formatting, see: 
+
+
+
+    # For labtalk documentation of graph formatting, see:
     # https://www.originlab.com/doc/LabTalk/guide/Formatting-Graphs
     # https://www.originlab.com/doc/LabTalk/ref/Layer-Axis-Label-obj
     # For matplotlib documentation, see:
@@ -286,17 +292,17 @@ def matplotlib_to_origin(
     #graph_layer.Execute('layer.y.label.pt = 12;')
     #graph_layer.Execute('xb.fsize = 16;')
     #graph_layer.Execute('yl.fsize = 16;')
-    
+
     # Set axis scales
     set_axis_scale(graph_layer,axis='x',scale=x_axis_scale)
     set_axis_scale(graph_layer,axis='y',scale=y_axis_scale)
     # Set axis ranges
-    graph_layer.Execute('layer.x.from = ' + str(x_axis_range[0]) + '; ' + 
+    graph_layer.Execute('layer.x.from = ' + str(x_axis_range[0]) + '; ' +
                            'layer.x.to = ' + str(x_axis_range[1]) + ';')
 
-    graph_layer.Execute('layer.y.from = '+str(y_axis_range[0])+'; '+ 
+    graph_layer.Execute('layer.y.from = '+str(y_axis_range[0])+'; '+
                            'layer.y.to = '+str(y_axis_range[1])+';')
-    
+
     # Set page dimensions based on figure size
     figure_size_inches = fig.get_size_inches()
     graph_page.SetWidth(figure_size_inches[0])
@@ -304,7 +310,7 @@ def matplotlib_to_origin(
     # graph_page.Execute('page.width= page.resx*'+str(figure_size_inches[0])+'; '+
                          # 'page.height= page.resy*'+str(figure_size_inches[1])+';')
     # Units 1 = % page, 2 = inches, 3 = cm, 4 = mm, 5 = pixel, 6 = points, and 7 = % of linked layer.
-    # graph_layer.Execute('layer.unit=2; ' + 
+    # graph_layer.Execute('layer.unit=2; ' +
                            # 'layer.width='+str(figure_size_inches[0])+'; '+
                            # 'layer.height='+str(figure_size_inches[1])+';')
     # Group each column (This allows colors to be automatically incremented
@@ -314,7 +320,7 @@ def matplotlib_to_origin(
     #graph_layer.Execute('Rescale')
     graph_layer.Execute('legend -r') # re-construct legend
     return origin
-        
+
 def numpy_to_origin(
     data_array,column_axis=0,types=None,
     long_names=None,comments=None,units=None,
@@ -329,7 +335,7 @@ def numpy_to_origin(
     user_defined = list of (key,value) tuples for metadata for a sheet
         e.g. [('Test Date','2019-01-01'),('Device Label','A12')]
     origin = origin session, which is returned from previous calls to this program
-             if passed, a new session will not be created, and graph will be added to 
+             if passed, a new session will not be created, and graph will be added to
              current session
     origin_version = 2016 other year, right now >2016 handles DataRange differently
     types = column types, either 'x','y','x_err','y_err','z','label', or 'ignore'
@@ -390,7 +396,7 @@ def numpy_to_origin(
             ws.Execute('col(1)[' + param[0] + ']$="' + param[1] + '";')
         origin.Execute('wks.col1.width=10;')
     return origin,wb,ws
-    
+
 def createGraph_multiwks(origin,graph_name,template,templatePath,worksheets,x_cols,y_cols,
                        LineOrSym=None,auto_rescale=True,
                        x_scale=None,y_scale=None,x_label=None,y_label=None,
@@ -445,12 +451,12 @@ def createGraph_multiwks(origin,graph_name,template,templatePath,worksheets,x_co
                 dr = origin.NewDataRange # Make a new datarange
             elif origin_version>=9.50: # 2018 or later
                 dr = origin.NewDataRange()
-            
+
             # Add data to data range
             #                  worksheet, start row, start col, end row (-1=last), end col
             dr.Add('X', worksheet, 0 , x_col,       -1, x_col)
             dr.Add('Y', worksheet, 0 , y_cols[ci], -1, y_cols[ci])
-            # Add data plot to graph layer 
+            # Add data plot to graph layer
             # list of types: https://www.originlab.com/doc/LabTalk/ref/Plot-Type-IDs
             # 200 -- line
             # 201 -- symbol
@@ -473,19 +479,19 @@ def createGraph_multiwks(origin,graph_name,template,templatePath,worksheets,x_co
         BeginIndex = ci*len(worksheets) + 1;
         EndIndex = BeginIndex + len(worksheets) - 1;
         graph_layer.Execute('layer -g ' + str(BeginIndex) + ' ' + str(EndIndex) + ';')
-    
+
     graph_layer.Execute('legend -r')
-    
+
     # Set axes scales
     set_axis_scale(graph_layer,axis='x',scale=x_scale)
     set_axis_scale(graph_layer,axis='y',scale=y_scale)
-    
+
     # Set axes titles (xb for bottom axis, yl for left y-axis, etc.)
     if not x_label is None:
         graph_layer.Execute('label -xb ' + x_label + ';')
     if not y_label is None:
         graph_layer.Execute('label -yl ' + y_label + ';')
-    
+
     # Rescales axes
     #Rescale type: 1 = manual, 2 = normal, 3 = auto, 4 = fixed from, and 5 = fixed to.
     #graph_layer.Execute('layer.axis.rescale=3')
@@ -496,7 +502,7 @@ def createGraph_multiwks(origin,graph_name,template,templatePath,worksheets,x_co
         graph_page.SetHeight(figsize[1])
     return graph_name
     # To exit, call origin.Exit()
-    
+
 # Could try to format from standard matplotlib keyword arguments, such as:
 # figsize, markersize
 # def format_from_mpl_kwargs(graph_page,graph_layer,**kwargs):
@@ -504,21 +510,21 @@ def createGraph_multiwks(origin,graph_name,template,templatePath,worksheets,x_co
     # if figsize in kwargs.keys():
         # graph_page.SetWidth(figsize[0])
         # graph_page.SetHeight(figsize[1])
-    
-'''
-Miscellaneous methods and commands that could be useful:
 
-Setting and getting height and width of graph page:
-origin.GraphPages(i).Height = 4
-origin.GraphPages(i).Width = 6
+# '''
+# Miscellaneous methods and commands that could be useful:
 
-Get number of workbooks, pages, etc.
-origin.WorksheetPages.Count
-origin.GraphPages.Count
-etc.
+# Setting and getting height and width of graph page:
+# origin.GraphPages(i).Height = 4
+# origin.GraphPages(i).Width = 6
 
-Get the parent workbook of a worksheet
-worksheets[0].Parent.Name
-    This also works to get the parent with graph layers
-(more docs here https://www.originlab.com/doc/COM/Classes/)
-'''
+# Get number of workbooks, pages, etc.
+# origin.WorksheetPages.Count
+# origin.GraphPages.Count
+# etc.
+
+# Get the parent workbook of a worksheet
+# worksheets[0].Parent.Name
+#     This also works to get the parent with graph layers
+# (more docs here https://www.originlab.com/doc/COM/Classes/)
+# '''
