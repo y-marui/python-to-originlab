@@ -9,12 +9,15 @@ readme = "README.md"
 python = "^3.11"
 matplotlib = "^3.6.3"
 originext = "^1.2.0"
+originpro = "^1.1.4"
 
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.20.2"
 pytest = "^7.2.1"
 autopep8 = "^2.0.1"
+astropy = "^5.2.1"
+astropy-extension = {git = "https://github.com/y-marui/astropy-extension"}
 
 [build-system]
 requires = ["poetry-core"]

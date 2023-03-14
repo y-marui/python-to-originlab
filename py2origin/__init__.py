@@ -12,19 +12,20 @@ https://www.originlab.com/doc/LabTalk/ref/
     e.g. changing axis scales, font sizes, etc.
 """
 
-import datetime
 import os
 import re
 import time
+import warnings
 
+import matplotlib
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 import OriginExt
+import originpro as op
 import win32com.client
 
 __version__ = "0.1.2"
-
 
 # Ideas for improvements:
 # - Compile line data (labels, format, color) into df
@@ -32,7 +33,9 @@ __version__ = "0.1.2"
 # - support for subplots / multiple layers
 # - support for double y or double x axes
 # - support for errorbars
-def set_axis_scale(graph_layer, axis='x', scale='linear'):
+
+
+def set_axis_scale(gl, axis='x', scale='linear'):
     # axis = 'x' or 'y'
     # scale = 'linear' or 'log'
     # graph_layer is origin graph_layer object
@@ -41,13 +44,13 @@ def set_axis_scale(graph_layer, axis='x', scale='linear'):
     # 3 = engineering, and 4 = decimal with commas (for date).
     # https://www.originlab.com/doc/LabTalk/ref/Layer-Axis-Label-obj
     if scale == 'linear':
-        graph_layer.Execute('layer.' + axis + '.type = 0;')
+        gl.lt_exec('layer.' + axis + '.type = 0;')
         # Change number format to decimal
-        graph_layer.Execute('layer.' + axis + '.label.numFormat=1')
+        gl.lt_exec('layer.' + axis + '.label.numFormat=1')
     elif scale == 'log':
-        graph_layer.Execute('layer.' + axis + '.type = 2;')
+        gl.lt_exec('layer.' + axis + '.type = 2;')
         # Change tick label number type to scientific
-        graph_layer.Execute('layer.' + axis + '.label.numFormat=2')
+        gl.lt_exec('layer.' + axis + '.label.numFormat=2')
     return
 
 
@@ -149,12 +152,15 @@ def save_project(origin, project_name, full_path):
 def matplotlib_to_origin(
         fig, ax,
         origin=None,
-        worksheet_name='Sheet', workbook_name='Book',
-        graph_name='Graph', template_name='LINE.otp',
-        template_path='OriginTemplates'):
+        folder_name=None,
+        workbook_name='Book',
+        worksheet_name='Sheet',
+        graph_name='Graph',
+        template_name='LINE.otp',
+        template_path=os.path.join(__path__[0], "OriginTemplates")):
     '''
     Inputs:
-    fig = matplotlib figure object
+    fig = matplotli b figure object
     ax = matplotlib axis object
     template = origin template name for desired plot, if exists
     templatePath = path on local computer to template folder
@@ -162,78 +168,100 @@ def matplotlib_to_origin(
              if passed, a new session will not be created, and graph will be added to
              current session
     '''
+    # See https://docs.originlab.com/originpro/index.html
     # If no origin session has been passed, start a new one
-    if origin is None:
-        origin = connect_to_origin()
-    origin_version = get_origin_version(origin)
+    op.attach()
+    op.set_show()
+
+    if folder_name is not None:
+        op.pe.cd("/")
+        op.pe.mkdir(folder_name, chk=True)
+        op.pe.cd(folder_name)
+
     # Create a workbook page
-    workbook = origin.CreatePage(2, workbook_name, 'Origin')  # 2 for workbook
-    # get workbook instance from name
-    wb = origin.WorksheetPages(workbook)
-    # Get worksheet instance, index starts at 0. Can add more worksheets with wb.Layers.Add
-    # wb.Layers.Add() for origin_version>2016
-    ws = wb.Layers(0)
-    ws.Name = worksheet_name  # Set worksheet name
-    # For now, assume only x and y data for each line (ignore error data)
-    ws.Cols = len(ax.lines) * 2  # Set number of columns in worksheet
+    wkb = op.new_book('w', workbook_name)
+    wks = wkb.add_sheet(worksheet_name)
 
     # Make graph page
     template = os.path.join(template_path, template_name)  # Pick template
     # Make a graph with the template
-    graph = origin.CreatePage(3, graph_name, template)
-    graph_page = origin.GraphPages(graph)  # Get graph page
-    graph_layer = origin.FindGraphLayer(graph)  # Get graph layer
-    data_plots = graph_layer.DataPlots  # Get dataplots
-    # Grouping indices (not yet implemented)
-    group_start_idx = 0
-    group_end_idx = 0
-    for line_idx, line in enumerate(ax.lines):
-        # Indices for x and y columns
-        x_col_idx = line_idx * 2
-        y_col_idx = x_col_idx + 1
-        col = ws.Columns(x_col_idx)  # Get column instance, index starts at 0
-        # Change column Units, Long Name, or Comments]
-        col.LongName = 'X'
-        col.Units = 'Unit'
-        col.Comments = ''
-        # Set column data type to ( 0=Y, 3=X , ?=X error, ?=Y error)
-        col.Type = 3
-        col = ws.Columns(y_col_idx)
-        col.Type = 0
-        col.LongName = 'Y'
-        col.Units = 'Unit'
-        # By default, lines have the label _line#
-        # If the first character isn't "_", put this label
-        # In the comments row
-        if not line.get_label()[0] == '_':
-            col.Comments = line.get_label()
+    gp = op.new_graph(graph_name, template)
+    print(template)
+    gl = gp[0]
+
+    # line blongs to container
+    contaienr_childeren = [
+        c for container in ax.containers for c in container.get_children()]
+
+    # extract lines
+    lines = [(line, None) for line in ax.lines if line not in contaienr_childeren] + \
+            [(container.lines[0], container) for container in ax.containers]
+
+    next_idx = 0
+    for line, container in lines:
+        # extract data
         xdata = line.get_xdata()
         if hasattr(xdata, "value"):
-            xdata = xdata.value
-        origin.PutWorksheet(
-            '[' + wb.Name + ']' + ws.Name,
-            np.float64(xdata).tolist(),
-            0,
-            x_col_idx)  # start row, start col
+            xdata = xdata.to(ax.xaxis.get_units()).value
         ydata = line.get_ydata()
         if hasattr(ydata, "value"):
-            ydata = ydata.value
-        origin.PutWorksheet(
-            '[' + wb.Name + ']' + ws.Name,
-            np.float64(ydata).tolist(),
-            0,
-            y_col_idx)  # start row, start col
+            ydata = ydata.to(ax.yaxis.get_units()).value
+        yerrdata = None
 
-        # Tested only on origin 2016 and 2018
-        if origin_version < 9.5:  # 2016 or earlier
-            dr = origin.NewDataRange  # Make a new datarange
-        elif origin_version >= 9.50:  # 2018 or later
-            dr = origin.NewDataRange()
-        # Add data to data range
-        # Column type, worksheet, start row, start col, end row (-1=last), end
-        # col
-        dr.Add('X', ws, 0, x_col_idx, -1, x_col_idx)
-        dr.Add('Y', ws, 0, y_col_idx, -1, y_col_idx)
+        if container is None:
+            label = line.get_label() if line.get_label()[0] != "_" else ''
+
+            # Indices for x and y columns
+            x_col_idx = next_idx
+            y_col_idx = next_idx + 1
+            yerr_col_idx = -1
+            next_idx += 2
+
+        elif isinstance(container, matplotlib.container.ErrorbarContainer):
+            label = container.get_label() if container.get_label()[
+                0] != "_" else ''
+
+            line = container.lines[0]
+            # Indices for x, y and yerr columns
+            x_col_idx = next_idx
+            y_col_idx = next_idx + 1
+            yerr_col_idx = next_idx + 2
+            next_idx += 3
+
+            yerrldata = container.lines[1][0].get_ydata()
+            yerrudata = container.lines[1][1].get_ydata()
+            yerrdata = (yerrudata - yerrldata) / 2
+            if hasattr(yerrdata, "value"):
+                yerrdata = yerrdata.to(ax.yaxis.get_units()).value
+
+        else:
+            warnings.warn(f"unknown container {container}")
+            continue
+
+        # Add data to sheet
+        wks.from_list(
+            x_col_idx,
+            np.float64(xdata).tolist(),
+            'X',
+            units='Unit',
+            comments='',
+            axis='X')
+        wks.from_list(
+            y_col_idx,
+            np.float64(ydata).tolist(),
+            'Y',
+            units='Unit',
+            comments=label,
+            axis='Y')
+        if yerrdata is not None:
+            wks.from_list(
+                yerr_col_idx,
+                np.float64(yerrdata).tolist(),
+                'Yerr',
+                units='Unit',
+                comments='',
+                axis='E')
+
         # Add data plot to graph layer
         # 200 -- line
         # 201 -- symbol
@@ -252,50 +280,71 @@ def matplotlib_to_origin(
         # https://matplotlib.org/api/markers_api.html
         mpl_sym_conv = {'s': '1', 'o': '2', '^': '3', 'v': '4', 'D': '5', '+': '6', 'x': '7',
                         '*': '8', '_': '9', '|': '10', 'h': '17', 'p': '19'}
+
+        # p.symbol_kind = 2
+
+        # 'l'(Line Plot) 's'(Scatter Plot) 'y' (Line Symbols) 'c' (Column) '?' auto(template)
         # Line
         if plt.getp(line, 'marker') == 'None':
-            graph_layer.AddPlot(dr, 200)
+            p = gl.add_plot(
+                wks,
+                y_col_idx,
+                x_col_idx,
+                type="l",
+                colyerr=yerr_col_idx)
             lc = colors.to_hex(plt.getp(line, 'color'))
             # Set line color and line width
-            graph_layer.Execute(
-                'range rr = !' + str(line_idx + 1) + '; ' +
-                'set rr -cl color(' + lc + ');' +  # line color
-                'set rr -w 500*' + str(plt.getp(line, 'linewidth')) + ';')  # line width
+            p.set_cmd(
+                '-cl color(' + lc + ')',
+                '-w 500*' + str(plt.getp(line, 'linewidth'))  # line width
+            )
 
         # Symbol
         elif plt.getp(line, 'linestyle') == 'None':
-            graph_layer.AddPlot(dr, 201)  # Previously data_plots.Add()
+            p = gl.add_plot(
+                wks,
+                y_col_idx,
+                x_col_idx,
+                type="s",
+                colyerr=yerr_col_idx)
             # Set symbol size, edge color, face color
             mec = colors.to_hex(plt.getp(line, 'mec'))
             mfc = colors.to_hex(plt.getp(line, 'mfc'))
-            graph_layer.Execute(
-                'range rr = !' + str(line_idx + 1) + '; ' +
-                # symbol type
-                'set rr -k ' + mpl_sym_conv[plt.getp(line, 'marker')] + ';' +
-                'set rr -kf 2;' +  # symbol interior
-                'set rr -z ' + str(plt.getp(line, 'ms')) + ';' +  # symbol size
-                'set rr -c color(' + mec + ');' +  # edge color
-                'set rr -cf color(' + mfc + ');' +  # face color
-                'set rr -kh 10*' + str(plt.getp(line, 'mew')) + ';')  # edge width
+            p.set_cmd(
+                '-k ' + mpl_sym_conv[plt.getp(line, 'marker')],  # symbol type
+                '-kf 2',  # symbol interior
+                '-z ' + str(plt.getp(line, 'ms')),  # symbol size
+                '-c color(' + mec + ')',  # face color
+                '-csf color(' + mfc + ')',  # edge color
+                '-kh 10*' + str(plt.getp(line, 'mew'))  # edge width
+            )
+
         # Line+Symbol
         else:
-            graph_layer.AddPlot(dr, 202)
+            p = gl.add_plot(
+                wks,
+                y_col_idx,
+                x_col_idx,
+                type="y",
+                colyerr=yerr_col_idx)
             # Set symbol size, edge color, face color
             lc = colors.to_hex(plt.getp(line, 'color'))
             mec = colors.to_hex(plt.getp(line, 'mec'))
             mfc = colors.to_hex(plt.getp(line, 'mfc'))
-            graph_layer.Execute(
-                'range rr = !' + str(line_idx + 1) + '; ' +
+            p.set_cmd(
                 # symbol type
-                'set rr -k ' + mpl_sym_conv[plt.getp(line, 'marker')] + ';' +
-                'set rr -kf 2;' +  # symbol interior
-                'set rr -z ' + str(plt.getp(line, 'ms')) + ';' +  # symbol size
-                'set rr -c color(' + mec + ');' +  # edge color
-                'set rr -cf color(' + mfc + ');' +  # face color
+                '-k ' + mpl_sym_conv[plt.getp(line, 'marker')],
+                '-kf 2',  # symbol interior
+                '-z ' + str(plt.getp(line, 'ms')),  # symbol size
+                '-c color(' + mec + ')',  # edge color
+                '-csf color(' + mfc + ')',  # face color
                 # edge width
-                'set rr -kh 10*' + str(plt.getp(line, 'mew')) + ';' +
-                'set rr -cl color(' + lc + ');' +  # line color
-                'set rr -w 500*' + str(plt.getp(line, 'linewidth')) + ';')  # line width
+                '-kh 10*' + str(plt.getp(line, 'mew')),
+                '-cl color(' + lc + ')',  # line color
+                '-w 500*' + str(plt.getp(line, 'linewidth')),  # line width
+            )
+
+        gl.rescale()
 
     # For labtalk documentation of graph formatting, see:
     # https://www.originlab.com/doc/LabTalk/guide/Formatting-Graphs
@@ -317,8 +366,8 @@ def matplotlib_to_origin(
     y_axis_label = re.sub(r"\$(.+?)\$", r"\\q(\1)", y_axis_label)
     title = ax.get_title()
     # Set axes titles (xb for bottom axis, yl for left y-axis, etc.)
-    graph_layer.Execute('label -xb ' + x_axis_label + ';')
-    graph_layer.Execute('label -yl ' + y_axis_label + ';')
+    gl.axis("x").title = x_axis_label
+    gl.axis("y").title = y_axis_label
     # Set fontsizes
     # graph_layer.Execute('layer.x.label.pt = 12;')
     # graph_layer.Execute('layer.y.label.pt = 12;')
@@ -326,19 +375,23 @@ def matplotlib_to_origin(
     # graph_layer.Execute('yl.fsize = 16;')
 
     # Set axis scales
-    set_axis_scale(graph_layer, axis='x', scale=x_axis_scale)
-    set_axis_scale(graph_layer, axis='y', scale=y_axis_scale)
+    set_axis_scale(gl, axis='x', scale=x_axis_scale)
+    set_axis_scale(gl, axis='y', scale=y_axis_scale)
     # Set axis ranges
-    graph_layer.Execute('layer.x.from = ' + str(x_axis_range[0]) + '; ' +
-                        'layer.x.to = ' + str(x_axis_range[1]) + ';')
-
-    graph_layer.Execute('layer.y.from = ' + str(y_axis_range[0]) + '; ' +
-                        'layer.y.to = ' + str(y_axis_range[1]) + ';')
+    gl.set_xlim(*x_axis_range)
+    gl.set_ylim(*y_axis_range)
 
     # Set page dimensions based on figure size
+    # Units 1 = % page, 2 = inches, 3 = cm, 4 = mm, 5 = pixel, 6 = points, and
+    # 7 = % of linked layer.
     figure_size_inches = fig.get_size_inches()
-    graph_page.SetWidth(figure_size_inches[0])
-    graph_page.SetHeight(figure_size_inches[1])
+    print(figure_size_inches)
+    gl.set_int("unit", 2)
+    gl.set_float("width", figure_size_inches[0])
+    gl.set_float("height", figure_size_inches[1])
+    op.lt_exec("pfit2l margin:=tight;")
+    # graph_page.SetWidth(figure_size_inches[0])
+    # graph_page.SetHeight(figure_size_inches[1])
     # graph_page.Execute('page.width= page.resx*'+str(figure_size_inches[0])+'; '+
     # 'page.height= page.resy*'+str(figure_size_inches[1])+';')
     # Units 1 = % page, 2 = inches, 3 = cm, 4 = mm, 5 = pixel, 6 = points, and 7 = % of linked layer.
@@ -350,8 +403,9 @@ def matplotlib_to_origin(
     # the same legend entry)
     # graph_layer.Execute('layer -g ' + str(group_start_idx) + ' '  + str(group_end_idx) + ';')
     # graph_layer.Execute('Rescale')
-    graph_layer.Execute('legend -r')  # re-construct legend
-    return origin
+    op.lt_exec('legend -r')  # re-construct legend
+
+    return op
 
 
 def numpy_to_origin(
