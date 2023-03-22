@@ -395,7 +395,6 @@ def matplotlib_to_origin(
     # Units 1 = % page, 2 = inches, 3 = cm, 4 = mm, 5 = pixel, 6 = points, and
     # 7 = % of linked layer.
     figure_size_inches = fig.get_size_inches()
-    print(figure_size_inches)
     gl.set_int("unit", 2)
     gl.set_float("width", figure_size_inches[0])
     gl.set_float("height", figure_size_inches[1])
