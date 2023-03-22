@@ -35,6 +35,10 @@ __version__ = "0.1.2"
 # - support for errorbars
 
 
+class SkipSave():
+    pass
+
+
 def set_axis_scale(gl, axis='x', scale='linear'):
     # axis = 'x' or 'y'
     # scale = 'linear' or 'log'
@@ -170,11 +174,15 @@ def matplotlib_to_origin(
     '''
     # See https://docs.originlab.com/originpro/index.html
     # If no origin session has been passed, start a new one
+
+    if origin == SkipSave:
+        return origin
+
     op.attach()
     op.set_show()
 
     if folder_name is not None:
-        op.pe.cd("/")
+        # op.pe.cd("/")
         op.pe.mkdir(folder_name, chk=True)
         op.pe.cd(folder_name)
 
@@ -186,8 +194,7 @@ def matplotlib_to_origin(
     template = os.path.join(template_path, template_name)  # Pick template
     # Make a graph with the template
     gp = op.new_graph(graph_name, template)
-    print(template)
-    gl = gp[0]
+    gl = gp[0] if gp is not None else None
 
     # line blongs to container
     contaienr_childeren = [
