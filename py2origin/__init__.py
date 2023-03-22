@@ -217,6 +217,7 @@ def matplotlib_to_origin(
 
         if container is None:
             label = line.get_label() if line.get_label()[0] != "_" else ''
+            label = re.sub(r"\$(.+?)\$", r"\\q(\1)", label)
 
             # Indices for x and y columns
             x_col_idx = next_idx
@@ -225,8 +226,8 @@ def matplotlib_to_origin(
             next_idx += 2
 
         elif isinstance(container, matplotlib.container.ErrorbarContainer):
-            label = container.get_label() if container.get_label()[
-                0] != "_" else ''
+            label = container.get_label() if container.get_label()[0] != "_" else ''
+            label = re.sub(r"\$(.+?)\$", r"\\q(\1)", label)
 
             line = container.lines[0]
             # Indices for x, y and yerr columns
@@ -287,6 +288,7 @@ def matplotlib_to_origin(
         # https://matplotlib.org/api/markers_api.html
         mpl_sym_conv = {'s': '1', 'o': '2', '^': '3', 'v': '4', 'D': '5', '+': '6', 'x': '7',
                         '*': '8', '_': '9', '|': '10', 'h': '17', 'p': '19'}
+        mpl_line_conv = {'-': '0', '--': '1', ':': '2', '-.': '3'}
 
         # p.symbol_kind = 2
 
@@ -302,6 +304,7 @@ def matplotlib_to_origin(
             lc = colors.to_hex(plt.getp(line, 'color'))
             # Set line color and line width
             p.set_cmd(
+                '-d ' + mpl_line_conv.get(plt.getp(line, 'linestyle'), '0'), # linestyle
                 '-cl color(' + lc + ')',
                 '-w 500*' + str(plt.getp(line, 'linewidth'))  # line width
             )
@@ -318,7 +321,7 @@ def matplotlib_to_origin(
             mec = colors.to_hex(plt.getp(line, 'mec'))
             mfc = colors.to_hex(plt.getp(line, 'mfc'))
             p.set_cmd(
-                '-k ' + mpl_sym_conv[plt.getp(line, 'marker')],  # symbol type
+                '-k ' + mpl_sym_conv.get(plt.getp(line, 'marker'), '0'),  # symbol type
                 '-kf 2',  # symbol interior
                 '-z ' + str(plt.getp(line, 'ms')),  # symbol size
                 '-c color(' + mec + ')',  # face color
@@ -411,6 +414,11 @@ def matplotlib_to_origin(
     # graph_layer.Execute('layer -g ' + str(group_start_idx) + ' '  + str(group_end_idx) + ';')
     # graph_layer.Execute('Rescale')
     op.lt_exec('legend -r')  # re-construct legend
+    title = ax.get_legend().get_title().get_text()
+    if title != "":
+        title = re.sub(r"\$(.+?)\$", r"\\q(\1)", title)
+        legend_text = op.get_lt_str("legend.text")
+        op.lt_exec(f"legend.text$={title}\n{legend_text};")
 
     return op
 
