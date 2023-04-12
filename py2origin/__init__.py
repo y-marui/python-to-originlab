@@ -153,7 +153,7 @@ def save_project(origin, project_name, full_path):
     origin.Execute("save " + os.path.join(full_path, project_name))
 
 
-def matplotlib_to_origin_bar(
+def matplotlib_to_origin(
         fig, ax,
         origin=None,
         folder_name=None,
