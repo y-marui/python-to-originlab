@@ -153,7 +153,7 @@ def save_project(origin, project_name, full_path):
     origin.Execute("save " + os.path.join(full_path, project_name))
 
 
-def matplotlib_to_origin(
+def matplotlib_to_origin_bar(
         fig, ax,
         origin=None,
         folder_name=None,
@@ -195,14 +195,16 @@ def matplotlib_to_origin(
     # Make a graph with the template
     gp = op.new_graph(graph_name, template)
     gl = gp[0] if gp is not None else None
-
+    
+    errobar_containers = [container for container in ax.containers if isinstance(container, ErrorbarContainer)]
+    
     # line blongs to container
     contaienr_childeren = [
-        c for container in ax.containers for c in container.get_children()]
+        c for container in errobar_containers for c in container.get_children()]
 
     # extract lines
     lines = [(line, None) for line in ax.lines if line not in contaienr_childeren] + \
-            [(container.lines[0], container) for container in ax.containers]
+            [(container.lines[0], container) for container in errobar_containers]
 
     next_idx = 0
     for line, container in lines:
@@ -226,7 +228,7 @@ def matplotlib_to_origin(
             next_idx += 2
 
         elif isinstance(container, matplotlib.container.ErrorbarContainer):
-            label = container.get_label() if container.get_label()[0] != "_" else ''
+            label = container.get_label() if container.get_label() is not None else ''
             label = re.sub(r"\$(.+?)\$", r"\\q(\1)", label)
 
             line = container.lines[0]
@@ -355,7 +357,51 @@ def matplotlib_to_origin(
             )
 
         gl.rescale()
+   
+    bar_containers = [container for container in ax.containers if isinstance(container, BarContainer)]
+    if len(bar_containers) > 1:
+        x_col_idx = next_idx
+        y_col_idx = next_idx + 1
+        xdata = [[label.get_position()[0], label.get_text()] for label in ax.get_xticklabels()]
+        xdata = sorted(xdata, key=lambda x:x[0])
+        xdata = np.array([v for _,v in xdata])
 
+        wks.from_list(
+                x_col_idx,
+                xdata.tolist(),
+                'X',
+                units='Unit',
+                comments='',
+                axis='X')
+
+        for i, container in enumerate(bar_containers):
+            label = container.get_label()
+            ydata = [[c.get_x(), c.get_height()] for c in container.get_children()]
+            ydata = sorted(ydata, key=lambda x:x[0])
+            ydata = np.array([v for _,v in ydata])
+
+            wks.from_list(
+                y_col_idx + i,
+                np.float64(ydata).tolist(),
+                'Y',
+                units='Unit',
+                comments=label,
+                axis='Y')
+
+            p = gl.add_plot(
+                    wks,
+                    y_col_idx+i,
+                    x_col_idx,
+                    type="c")
+            mfc = colors.to_hex(plt.getp(container[0], "facecolor"))
+            p.set_cmd(
+                '-cf color(' + mfc + ')',  # face color
+            )
+
+    g = gl.group(True,0,len(bar_containers)-1)
+    next_idx += len(bar_containers) + 1
+    gl.rescale()
+    
     # For labtalk documentation of graph formatting, see:
     # https://www.originlab.com/doc/LabTalk/guide/Formatting-Graphs
     # https://www.originlab.com/doc/LabTalk/ref/Layer-Axis-Label-obj
