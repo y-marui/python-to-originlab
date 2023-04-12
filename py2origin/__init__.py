@@ -24,6 +24,7 @@ import numpy as np
 import OriginExt
 import originpro as op
 import win32com.client
+from matplotlib.axes import ErrorbarContainer, BarContainer
 
 __version__ = "0.1.2"
 
