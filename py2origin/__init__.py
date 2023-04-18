@@ -460,7 +460,13 @@ def matplotlib_to_origin(
     # graph_layer.Execute('layer -g ' + str(group_start_idx) + ' '  + str(group_end_idx) + ';')
     # graph_layer.Execute('Rescale')
     op.lt_exec('legend -r')  # re-construct legend
-    title = ax.get_legend().get_title().get_text()
+    title = ax.get_legend()
+    # Whether ledgend exists
+    if title is None:
+        title = ""
+    else:
+        title = title.get_title().get_text()
+    # If title exsits add title
     if title != "":
         title = re.sub(r"\$(.+?)\$", r"\\q(\1)", title)
         legend_text = op.get_lt_str("legend.text")
