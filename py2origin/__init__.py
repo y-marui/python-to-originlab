@@ -399,9 +399,9 @@ def matplotlib_to_origin(
                 '-cf color(' + mfc + ')',  # face color
             )
 
-    g = gl.group(True,0,len(bar_containers)-1)
-    next_idx += len(bar_containers) + 1
-    gl.rescale()
+        g = gl.group(True,0,len(bar_containers)-1)
+        next_idx += len(bar_containers) + 1
+        gl.rescale()
     
     # For labtalk documentation of graph formatting, see:
     # https://www.originlab.com/doc/LabTalk/guide/Formatting-Graphs
