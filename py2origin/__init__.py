@@ -15,7 +15,7 @@ https://www.originlab.com/doc/LabTalk/ref/
 import os
 import re
 import time
-import warnings
+import warningszw
 
 import matplotlib
 import matplotlib.colors as colors
@@ -24,6 +24,7 @@ import numpy as np
 import OriginExt
 import originpro as op
 import win32com.client
+from matplotlib.axes import ErrorbarContainer, BarContainer
 
 __version__ = "0.1.2"
 
@@ -196,13 +197,18 @@ def matplotlib_to_origin(
     gp = op.new_graph(graph_name, template)
     gl = gp[0] if gp is not None else None
 
+    errobar_containers = [
+        container for container in ax.containers if isinstance(
+            container, ErrorbarContainer)]
+
     # line blongs to container
     contaienr_childeren = [
-        c for container in ax.containers for c in container.get_children()]
+        c for container in errobar_containers for c in container.get_children()]
 
     # extract lines
     lines = [(line, None) for line in ax.lines if line not in contaienr_childeren] + \
-            [(container.lines[0], container) for container in ax.containers]
+            [(container.lines[0], container)
+             for container in errobar_containers]
 
     next_idx = 0
     for line, container in lines:
@@ -226,7 +232,7 @@ def matplotlib_to_origin(
             next_idx += 2
 
         elif isinstance(container, matplotlib.container.ErrorbarContainer):
-            label = container.get_label() if container.get_label()[0] != "_" else ''
+            label = container.get_label() if container.get_label() is not None else ''
             label = re.sub(r"\$(.+?)\$", r"\\q(\1)", label)
 
             line = container.lines[0]
@@ -304,7 +310,8 @@ def matplotlib_to_origin(
             lc = colors.to_hex(plt.getp(line, 'color'))
             # Set line color and line width
             p.set_cmd(
-                '-d ' + mpl_line_conv.get(plt.getp(line, 'linestyle'), '0'), # linestyle
+                # linestyle
+                '-d ' + mpl_line_conv.get(plt.getp(line, 'linestyle'), '0'),
                 '-cl color(' + lc + ')',
                 '-w 500*' + str(plt.getp(line, 'linewidth'))  # line width
             )
@@ -321,7 +328,8 @@ def matplotlib_to_origin(
             mec = colors.to_hex(plt.getp(line, 'mec'))
             mfc = colors.to_hex(plt.getp(line, 'mfc'))
             p.set_cmd(
-                '-k ' + mpl_sym_conv.get(plt.getp(line, 'marker'), '0'),  # symbol type
+                # symbol type
+                '-k ' + mpl_sym_conv.get(plt.getp(line, 'marker'), '0'),
                 '-kf 2',  # symbol interior
                 '-z ' + str(plt.getp(line, 'ms')),  # symbol size
                 '-c color(' + mec + ')',  # face color
@@ -354,6 +362,54 @@ def matplotlib_to_origin(
                 '-w 500*' + str(plt.getp(line, 'linewidth')),  # line width
             )
 
+        gl.rescale()
+
+    bar_containers = [
+        container for container in ax.containers if isinstance(
+            container, BarContainer)]
+    if len(bar_containers) > 1:
+        x_col_idx = next_idx
+        y_col_idx = next_idx + 1
+        xdata = [[label.get_position()[0], label.get_text()]
+                 for label in ax.get_xticklabels()]
+        xdata = sorted(xdata, key=lambda x: x[0])
+        xdata = np.array([v for _, v in xdata])
+
+        wks.from_list(
+            x_col_idx,
+            xdata.tolist(),
+            'X',
+            units='Unit',
+            comments='',
+            axis='X')
+
+        for i, container in enumerate(bar_containers):
+            label = container.get_label()
+            ydata = [[c.get_x(), c.get_height()]
+                     for c in container.get_children()]
+            ydata = sorted(ydata, key=lambda x: x[0])
+            ydata = np.array([v for _, v in ydata])
+
+            wks.from_list(
+                y_col_idx + i,
+                np.float64(ydata).tolist(),
+                'Y',
+                units='Unit',
+                comments=label,
+                axis='Y')
+
+            p = gl.add_plot(
+                wks,
+                y_col_idx + i,
+                x_col_idx,
+                type="c")
+            mfc = colors.to_hex(plt.getp(container[0], "facecolor"))
+            p.set_cmd(
+                '-cf color(' + mfc + ')',  # face color
+            )
+
+        g = gl.group(True, 0, len(bar_containers) - 1)
+        next_idx += len(bar_containers) + 1
         gl.rescale()
 
     # For labtalk documentation of graph formatting, see:
@@ -413,7 +469,13 @@ def matplotlib_to_origin(
     # graph_layer.Execute('layer -g ' + str(group_start_idx) + ' '  + str(group_end_idx) + ';')
     # graph_layer.Execute('Rescale')
     op.lt_exec('legend -r')  # re-construct legend
-    title = ax.get_legend().get_title().get_text()
+    title = ax.get_legend()
+    # Whether ledgend exists
+    if title is None:
+        title = ""
+    else:
+        title = title.get_title().get_text()
+    # If title exsits add title
     if title != "":
         title = re.sub(r"\$(.+?)\$", r"\\q(\1)", title)
         legend_text = op.get_lt_str("legend.text")
